@@ -1,0 +1,13 @@
+{
+  "name": "html2image-api",
+  "version": "1.0.0",
+  "description": "Microservice to render HTML/CSS to image using Puppeteer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^22.10.0"
+  }
+}
