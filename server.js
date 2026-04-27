@@ -3,7 +3,6 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
-const { marked } = require('marked');
 const moment = require('moment-timezone');
 
 const app = express();
@@ -94,7 +93,9 @@ app.post('/render-template', async (req, res) => {
     // Prepare params
     const templateParams = { ...params };
     
-    // Process Markdown for title and subtitle
+    // Process Markdown for title and subtitle using dynamic import for the ESM module
+    const { marked } = await import('marked');
+    
     if (templateParams.title) {
       templateParams.title = marked.parseInline(templateParams.title);
     }
