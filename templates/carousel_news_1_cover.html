@@ -42,9 +42,10 @@
       .top-bar {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-top: 0;
-        margin-bottom: 1vh;
+        align-items: flex-end;
+        margin-top: -3.5vh; /* pulls it up overlapping the image */
+        margin-bottom: 2vh;
+        z-index: 10;
       }
       .breaking-badge {
         background-color: #e3000f;
@@ -60,13 +61,11 @@
         font-weight: 700;
         font-size: 2vh;
         color: #000;
-        margin-top: 2vh;
+        background-color: white;
+        padding: 1vh 2vw;
       }
       .divider {
-        width: 18vw;
-        height: 0.4vh;
-        background-color: #000;
-        margin-bottom: 3vh; /* Reduced margin slightly to give more room for title */
+        display: none; /* removed */
       }
       .title-wrapper {
         flex: 1; /* Take up all remaining space between divider and footer */
@@ -152,7 +151,6 @@
         <div class="breaking-badge">BREAKING</div>
         <div class="date-text">{{date}}</div>
       </div>
-      <div class="divider"></div>
 
       <div class="title-wrapper" id="fit-container">
         <div class="title-block">
