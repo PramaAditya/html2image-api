@@ -16,8 +16,8 @@ app.post('/render', async (req, res) => {
       return res.status(400).json({ error: 'The "html" field is required' });
     }
 
-    const width = viewport?.width || 1200;
-    const height = viewport?.height || 630;
+    const width = parseInt(viewport?.width, 10) || 1200;
+    const height = parseInt(viewport?.height, 10) || 630;
 
     browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
