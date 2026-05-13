@@ -9,6 +9,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
 
 // Helper to launch puppeteer
 async function getBrowser() {
@@ -35,6 +36,11 @@ app.post('/render', async (req, res) => {
     const page = await browser.newPage();
     await page.setViewport({ width, height });
 
+    const pendingRequests = new Set();
+    page.on('request', request => pendingRequests.add(request.url()));
+    page.on('requestfinished', request => pendingRequests.delete(request.url()));
+    page.on('requestfailed', request => pendingRequests.delete(request.url()));
+
     const fullHtml = `
       <!DOCTYPE html>
       <html lang="en">
@@ -52,7 +58,7 @@ app.post('/render', async (req, res) => {
         </main>
       </body>
       </html>
-    `;
+    `.replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/textfit\/2\.4\.0\/textFit\.min\.js/g, `http://localhost:${port}/textFit.min.js`);
 
     try {
       await page.setContent(fullHtml, {
@@ -61,6 +67,7 @@ app.post('/render', async (req, res) => {
       });
     } catch (e) {
       console.warn('Timeout waiting for networkidle0, proceeding with screenshot anyway.');
+      console.warn('Pending requests:', Array.from(pendingRequests));
     }
 
     const imageBuffer = await page.screenshot({ type: 'png' });
@@ -120,7 +127,8 @@ app.post('/render-template', async (req, res) => {
       templateParams.my_handle = '@poros.perjuangan';
     }
 
-    const htmlContent = compiledTemplate(templateParams);
+    const htmlContent = compiledTemplate(templateParams)
+      .replace(/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/textfit\/2\.4\.0\/textFit\.min\.js/g, `http://localhost:${port}/textFit.min.js`);
 
     const width = parseInt(viewport?.width, 10) || 1080;
     const height = parseInt(viewport?.height, 10) || 1350;
@@ -129,6 +137,11 @@ app.post('/render-template', async (req, res) => {
     const page = await browser.newPage();
     await page.setViewport({ width, height });
 
+    const pendingRequests = new Set();
+    page.on('request', request => pendingRequests.add(request.url()));
+    page.on('requestfinished', request => pendingRequests.delete(request.url()));
+    page.on('requestfailed', request => pendingRequests.delete(request.url()));
+
     try {
       await page.setContent(htmlContent, {
         waitUntil: ['networkidle0', 'load', 'domcontentloaded'],
@@ -136,6 +149,7 @@ app.post('/render-template', async (req, res) => {
       });
     } catch (e) {
       console.warn('Timeout waiting for networkidle0, proceeding with screenshot anyway.');
+      console.warn('Pending requests:', Array.from(pendingRequests));
     }
 
     const imageBuffer = await page.screenshot({ type: 'png' });
