@@ -54,9 +54,14 @@ app.post('/render', async (req, res) => {
       </html>
     `;
 
-    await page.setContent(fullHtml, {
-      waitUntil: ['networkidle0', 'load', 'domcontentloaded']
-    });
+    try {
+      await page.setContent(fullHtml, {
+        waitUntil: ['networkidle0', 'load', 'domcontentloaded'],
+        timeout: 15000
+      });
+    } catch (e) {
+      console.warn('Timeout waiting for networkidle0, proceeding with screenshot anyway.');
+    }
 
     const imageBuffer = await page.screenshot({ type: 'png' });
 
@@ -124,9 +129,14 @@ app.post('/render-template', async (req, res) => {
     const page = await browser.newPage();
     await page.setViewport({ width, height });
 
-    await page.setContent(htmlContent, {
-      waitUntil: ['networkidle0', 'load', 'domcontentloaded']
-    });
+    try {
+      await page.setContent(htmlContent, {
+        waitUntil: ['networkidle0', 'load', 'domcontentloaded'],
+        timeout: 15000
+      });
+    } catch (e) {
+      console.warn('Timeout waiting for networkidle0, proceeding with screenshot anyway.');
+    }
 
     const imageBuffer = await page.screenshot({ type: 'png' });
 
