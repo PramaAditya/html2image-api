@@ -5,7 +5,7 @@ const path = require('path');
 const Handlebars = require('handlebars');
 const moment = require('moment-timezone');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto');
 require('dotenv').config();
 
 const app = express();
