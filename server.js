@@ -221,8 +221,14 @@ async function uploadToS3(buffer, filename) {
 
   await s3Client.send(command);
   
-  const publicUrlBase = process.env.S3_PUBLIC_URL_BASE || process.env.S3_ENDPOINT;
-  return `${publicUrlBase}/${process.env.S3_BUCKET}/${key}`;
+  if (process.env.S3_PUBLIC_URL_BASE) {
+    // If a public URL base is provided, assume it maps directly to the bucket root
+    // e.g. CDN or custom domain
+    return `${process.env.S3_PUBLIC_URL_BASE}/${key}`;
+  }
+  
+  // Fallback to endpoint + bucket name for standard path-style S3 URLs
+  return `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${key}`;
 }
 
 // 3. New /render-template-multiple endpoint for Interval
