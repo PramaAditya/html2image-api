@@ -7,6 +7,22 @@ A Dockerized microservice REST API that uses Node.js, Express, and Puppeteer to 
 - Docker
 - Docker Compose
 
+## Environment Variables
+
+For the `/render-template-multiple` endpoint which uploads generated images to AWS S3 (or Cloudflare R2), you will need to set up a `.env` file in the root of the project:
+
+```env
+PORT=3000
+S3_ENDPOINT=https://your-endpoint.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=your-access-key-id
+S3_SECRET_ACCESS_KEY=your-secret-access-key
+S3_PUBLIC_URL_BASE=https://your-public-domain.com
+S3_REGION=auto
+S3_BUCKET=storage
+S3_FORCE_PATH_STYLE=true
+S3_ROOT_FOLDER=mediatemplate
+```
+
 ## Getting Started
 
 1. Clone or download this repository.
@@ -83,6 +99,50 @@ curl -X POST http://localhost:3000/render-template \
     }
   }' \
   --output template_result.png
+```
+
+### `POST /render-template-multiple`
+
+Accepts a JSON payload indicating data for the `interval` slide deck. It renders the `interval_cover` template and then loops through the slides rendering the `interval_slide` template. Each image is then automatically uploaded to S3/R2 and an array of public URLs is returned.
+
+**Request Payload:**
+
+- `logo` (string): URL to the logo image.
+- `cover_image` (string): URL to the cover background image.
+- `title` (string): Markdown supported title text.
+- `slides` (array of objects): Array containing text for each slide.
+  - `text` (string): Markdown supported slide content.
+
+**Example cURL Request:**
+
+```bash
+curl -X POST http://localhost:3000/render-template-multiple \
+  -H "Content-Type: application/json" \
+  -d '{
+    "logo": "https://example.com/logo.png",
+    "cover_image": "https://images.unsplash.com/photo-1590424744257-fdb03ed78be0?auto=format&fit=crop&w=1080&q=80",
+    "title": "Warrantless Surveillance Powers Vote Passes House, Moves to Senate",
+    "slides": [
+      {
+        "text": "The House voted 235-191 on April 29 to extend warrantless surveillance powers for three years.\n\nIt extends Section 702 of FISA which is the law that lets the NSA and FBI surveil emails, texts, and phone calls of foreigners outside the US without getting a warrant."
+      },
+      {
+        "text": "**FISA has been used to target American citizens, allowing the government to spy on journalists, members of Congress, and even Trump himself.**"
+      }
+    ]
+  }'
+```
+
+**Example JSON Response:**
+
+```json
+{
+  "urls": [
+    "https://storage.pelita.tech/storage/mediatemplate/interval-cover-6bd6cae2-a05f-4d37-8f6a-12e3b2a59a72.png",
+    "https://storage.pelita.tech/storage/mediatemplate/interval-slide-1-29074b1e-b873-45ab-9ff9-72c695a48d8c.png",
+    "https://storage.pelita.tech/storage/mediatemplate/interval-slide-2-58197c3d-f219-48cd-b12e-1e4708a3d99e.png"
+  ]
+}
 ```
 
 ## Adding New Templates

@@ -4,12 +4,25 @@ const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
 const moment = require('moment-timezone');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { v4: uuidv4 } = require('uuid');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
+
+const s3Client = new S3Client({
+  region: process.env.S3_REGION || 'auto',
+  endpoint: process.env.S3_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  },
+  forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+});
 
 // Helper to launch puppeteer
 async function getBrowser() {
@@ -163,6 +176,120 @@ app.post('/render-template', async (req, res) => {
     if (browser) {
       await browser.close();
     }
+  }
+});
+
+// Helper to render HTML to image buffer
+async function renderHtmlToBuffer(htmlContent, width, height) {
+  const browser = await getBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width, height });
+
+    const pendingRequests = new Set();
+    page.on('request', request => pendingRequests.add(request.url()));
+    page.on('requestfinished', request => pendingRequests.delete(request.url()));
+    page.on('requestfailed', request => pendingRequests.delete(request.url()));
+
+    try {
+      await page.setContent(htmlContent, {
+        waitUntil: ['networkidle0', 'load', 'domcontentloaded'],
+        timeout: 15000
+      });
+    } catch (e) {
+      console.warn('Timeout waiting for networkidle0, proceeding with screenshot anyway.');
+    }
+
+    const imageBuffer = await page.screenshot({ type: 'png' });
+    return imageBuffer;
+  } finally {
+    await browser.close();
+  }
+}
+
+// Helper to upload buffer to S3
+async function uploadToS3(buffer, filename) {
+  const rootFolder = process.env.S3_ROOT_FOLDER ? `${process.env.S3_ROOT_FOLDER}/` : '';
+  const key = `${rootFolder}${filename}`;
+
+  const command = new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: 'image/png',
+  });
+
+  await s3Client.send(command);
+  
+  const publicUrlBase = process.env.S3_PUBLIC_URL_BASE || process.env.S3_ENDPOINT;
+  return `${publicUrlBase}/${process.env.S3_BUCKET}/${key}`;
+}
+
+// 3. New /render-template-multiple endpoint for Interval
+app.post('/render-template-multiple', async (req, res) => {
+  try {
+    const { logo, cover_image, title, slides } = req.body;
+
+    if (!title || !slides || !Array.isArray(slides)) {
+      return res.status(400).json({ error: 'title and slides array are required' });
+    }
+
+    const viewport = { width: 1080, height: 1350 };
+    const imageUrls = [];
+
+    // Helper function to compile template
+    const compileTemplate = (templateName) => {
+      const templatePath = path.join(__dirname, 'templates', `${templateName}.html`);
+      const templateSource = fs.readFileSync(templatePath, 'utf8');
+      return Handlebars.compile(templateSource);
+    };
+
+    const coverTemplate = compileTemplate('interval_cover');
+    const slideTemplate = compileTemplate('interval_slide');
+
+    // Process Markdown for title using dynamic import for the ESM module
+    const { marked } = await import('marked');
+    const parsedTitle = marked.parseInline(title);
+
+    // 1. Render Cover
+    const coverHtml = coverTemplate({ logo: logo || 'interval', cover_image, title: parsedTitle });
+    const coverBuffer = await renderHtmlToBuffer(coverHtml, viewport.width, viewport.height);
+    const coverFilename = `interval-cover-${uuidv4()}.png`;
+    const coverUrl = await uploadToS3(coverBuffer, coverFilename);
+    imageUrls.push(coverUrl);
+
+    // Helper for Roman numerals
+    const toRoman = (num) => {
+      const roman = {
+        M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1
+      };
+      let str = '';
+      for (let i of Object.keys(roman)) {
+        let q = Math.floor(num / roman[i]);
+        num -= q * roman[i];
+        str += i.repeat(q);
+      }
+      return str;
+    };
+
+    // 2. Render Slides
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      const romanNumber = toRoman(i + 1);
+      
+      const parsedText = marked.parse(slide.text);
+
+      const slideHtml = slideTemplate({ roman_number: romanNumber, text: parsedText });
+      const slideBuffer = await renderHtmlToBuffer(slideHtml, viewport.width, viewport.height);
+      const slideFilename = `interval-slide-${i+1}-${uuidv4()}.png`;
+      const slideUrl = await uploadToS3(slideBuffer, slideFilename);
+      imageUrls.push(slideUrl);
+    }
+
+    res.json({ urls: imageUrls });
+  } catch (error) {
+    console.error('Render Template Multiple error:', error);
+    res.status(500).json({ error: 'Failed to render multiple templates', details: error.message });
   }
 });
 
