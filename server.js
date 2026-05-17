@@ -240,7 +240,15 @@ app.post('/render-template-multiple', async (req, res) => {
     // Helper function to compile template
     const compileTemplate = (templateName) => {
       const templatePath = path.join(__dirname, 'templates', `${templateName}.html`);
-      const templateSource = fs.readFileSync(templatePath, 'utf8');
+      let templateSource = fs.readFileSync(templatePath);
+      
+      // Check for UTF-16 LE BOM
+      if (templateSource.length >= 2 && templateSource[0] === 0xff && templateSource[1] === 0xfe) {
+        templateSource = templateSource.toString('utf16le');
+      } else {
+        templateSource = templateSource.toString('utf8');
+      }
+      
       return Handlebars.compile(templateSource);
     };
 
