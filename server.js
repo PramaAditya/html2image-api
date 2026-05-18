@@ -293,7 +293,7 @@ app.post('/render-template-multiple', async (req, res) => {
       
       const parsedText = marked.parse(slide.text);
 
-      const slideHtml = slideTemplate({ roman_number: romanNumber, text: parsedText });
+      const slideHtml = slideTemplate({ roman_number: romanNumber, text: parsedText, cover_image });
       const slideBuffer = await renderHtmlToBuffer(slideHtml, viewport.width, viewport.height);
       const slideFilename = `interval-slide-${i+1}-${uuidv4()}.png`;
       const slideUrl = await uploadToS3(slideBuffer, slideFilename);
